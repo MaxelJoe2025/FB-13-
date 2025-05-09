@@ -1,0 +1,159 @@
+<!DOCTYPE html><html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>استوديو إنتاج الأنمي</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0a0a0a;
+      color: white;
+      padding: 30px;
+    }
+    input, textarea, select, button {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+    }
+    button {
+      background-color: #00ffee;
+      color: black;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    h1, h2, h3 {
+      color: #00ffee;
+    }
+    .char-box {
+      background-color: #111;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div style="text-align: center; margin-bottom: 30px;">
+    <h1 style="font-size: 32px; color: #00ffee; text-shadow: 0 0 10px #00ffee;">
+      FB-13 | استديو أنمي احترافي
+    </h1>
+  </div>  <h2>استوديو إنتاج أنمي بالذكاء الاصطناعي</h2><label>عنوان الحلقة:</label> <input type="text" id="episode_title" placeholder="عنوان الحلقة">
+
+<label>قصة الحلقة:</label>
+
+  <textarea id="episode_story" rows="4" placeholder="اكتب قصة أو مشاهد الحلقة..."></textarea><label>نوع الأنمي (اكتب النوع):</label> <input type="text" id="animation_type" placeholder="مثال: أكشن، دراما، خيال...">
+
+  <h3>خيارات إنتاج الحلقة:</h3>
+  <label><input type="radio" name="effects" value="full" checked> كل شيء (مؤثرات + صوت شخصيات)</label>
+  <label><input type="radio" name="effects" value="no_effects"> بدون مؤثرات</label>
+  <label><input type="radio" name="effects" value="effects_only"> مؤثرات فقط بدون صوت الشخصيات</label>  <h3>نوع الحركة في الحلقة:</h3>
+  <select id="motion_type">
+    <option value="simple">حركة سلسة</option>
+    <option value="complex">حركة معقدة</option>
+    <option value="pro">أنمي احترافي للغاية</option>
+  </select>  <h3>الشخصيات (حتى 15 شخصية):</h3>
+  <div id="characterFields"></div><button onclick="generateAnime()">إنشاء الحلقة</button>
+
+  <div id="result"></div>  <h2>الحلقات السابقة:</h2>
+  <div id="episodesList"></div>  <script>
+    for (let i = 1; i <= 15; i++) {
+      const charBox = document.createElement('div');
+      charBox.classList.add('char-box');
+      charBox.innerHTML = `
+        <label>شخصية ${i}</label>
+        <input type="text" placeholder="اسم الشخصية" id="char_name_${i}">
+        <input type="text" placeholder="وصف مختصر" id="char_desc_${i}">
+        <input type="file" accept="image/*" id="char_img_${i}">
+      `;
+      document.getElementById('characterFields').appendChild(charBox);
+    }
+
+    window.onload = function () {
+      const savedEpisodes = JSON.parse(localStorage.getItem("episodes")) || [];
+      savedEpisodes.forEach(episode => {
+        addEpisodeToList(episode.title, episode.url);
+      });
+    };
+
+    function addEpisodeToList(title, url) {
+      const episodeBox = document.createElement('div');
+      episodeBox.innerHTML = `
+        <h3>${title}</h3>
+        <video controls style="width: 80%; max-width: 700px; border-radius: 20px;">
+          <source src="${url}" type="video/mp4">
+          المتصفح لا يدعم تشغيل الفيديو.
+        </video>
+        <br>
+        <a href="${url}" download>
+          <button>تحميل الحلقة</button>
+        </a>
+        <hr style="margin: 40px 0; border-color: #00ffee;">
+      `;
+      document.getElementById('episodesList').prepend(episodeBox);
+    }
+
+    async function generateAnime() {
+      const characters = [];
+
+      for (let i = 1; i <= 15; i++) {
+        const name = document.getElementById(`char_name_${i}`).value.trim();
+        const description = document.getElementById(`char_desc_${i}`).value.trim();
+        const fileInput = document.getElementById(`char_img_${i}`);
+        const imageFile = fileInput.files[0];
+
+        if (name && imageFile) {
+          const imageUrl = await uploadImage(imageFile);
+          characters.push({ name, description, image_url: imageUrl });
+        }
+      }
+
+      const data = {
+        episode_title: document.getElementById('episode_title').value,
+        episode_story: document.getElementById('episode_story').value,
+        animation_type: document.getElementById('animation_type').value,
+        effects_mode: document.querySelector('input[name="effects"]:checked').value,
+        motion_type: document.getElementById('motion_type').value,
+        characters: characters
+      };
+
+      const res = await fetch('https://fb13-anime.com/api/generate-episode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      const result = await res.json();
+
+      if (result.status === 'success') {
+        const title = data.episode_title;
+        const url = result.video_url;
+
+        document.getElementById('result').innerHTML = `<p>تم إنشاء الحلقة!</p><a href="${url}" target="_blank">مشاهدة الحلقة</a>`;
+
+        addEpisodeToList(title, url);
+
+        const savedEpisodes = JSON.parse(localStorage.getItem("episodes")) || [];
+        savedEpisodes.unshift({ title, url });
+        localStorage.setItem("episodes", JSON.stringify(savedEpisodes));
+      } else {
+        document.getElementById('result').innerHTML = `<p>حدث خطأ: ${result.message}</p>`;
+      }
+    }
+
+    async function uploadImage(file) {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("https://api.imgbb.com/1/upload?key=YOUR_API_KEY", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await response.json();
+      return data.data.url;
+    }
+  </script></body>
+</html>
